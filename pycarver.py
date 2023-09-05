@@ -1,10 +1,11 @@
-#from pycarver_utils import pycarver_ui as ui
 from pycarver_utils import image_loader as il
 
 import tkinter as tk
 import tkinter.filedialog as fd
 import os
+import numpy
 from PIL import Image
+from PIL import ImageMath
 
 class Carver(object):
     """
@@ -13,28 +14,44 @@ class Carver(object):
     
     def __init__(self, 
                  image:Image, *, 
-                 x_dim:float=None, 
-                 y_dim:float=None,
+                 size:float=None, 
                  target_dpi:float=300.0,
                  use_image_dpi:bool=False
                  ) -> None:
         """
         Initialize the Scaler object
         :param image: image to scale
-        :param x_dim: x dimension to scale to (inches)
+        :param size: the size in inches of the longest dimension (inches)
         :param y_dim: y dimension to scale to (inches)
         :param target_dpi: target dpi to scale to (default 300.0)
         :param use_image_dpi: use the image dpi to scale
         """
         self.image = image
-        self.x_dim = x_dim
-        self.y_dim = y_dim
+        self.size = size
         self.use_image_dpi = use_image_dpi
-        self.target_dpi = target_dpi
-        
-        self.scaled_image = None
-        self._scale_image()
+        self.target_dpi = \
+            (
+            target_dpi 
+            if not use_image_dpi or 'dpi' not in image.info 
+            else
+            sum([v for v in image.info['dpi']]) / len(image.info['dpi'])
+            )
+        self.scaled_image = self._scale_image()
+        self.quantized_image = self._quantize_image()
+        self.carving_area = self._get_carving_area()
         pass
+    
+    def __str__(self) -> str:
+        return f"""<Carver:
+                Filename: {self.image.filename}
+                Image: {self.image}
+                Size: {self.size}
+                Target DPI: {self.target_dpi}
+                Use Image DPI: {self.use_image_dpi}
+                Scaled Image: {self.scaled_image}
+                Quantized Image: {self.quantized_image}
+                Carving Area: {self.carving_area}
+>"""
     
     def _inches_to_px(self, inches:float) -> float:
         """
@@ -45,18 +62,16 @@ class Carver(object):
         if inches is None:
             return None
         else:
-            return inches * self.target_dpi
+            return round(inches * self.target_dpi)
     
     def _scale_image(self) -> Image:
         """
         Scale the image to the given dimensions or use dpi
         """
         if self.use_image_dpi:
-            self._scale_image_dpi()
-            return None
+            return self._scale_image_dpi()
         else:
-            self._scale_image_dimensions()
-            return None
+            return self._scale_image_dimensions()
     
     def _scale_image_dpi(self) -> Image:
         """
@@ -71,15 +86,33 @@ class Carver(object):
         self.scaled_image = self.image
         self.scaled_image.resize((x_dim, y_dim))
         return self.scaled_image
-             
+
+    def _quantize_image(self) -> Image:
+        """
+        Quantize the image to 2 bits (black and white)
+        """
+        return self.scaled_image.quantize(2)
+    
+    def _get_carving_area(self) -> float:
+        """
+        Get the area to carve
+        """
+        to_carve = len([px for px in self.quantized_image.getdata() if px == 1])
+        return to_carve / (self.target_dpi**2)
+
     def _scale_image_dimensions(self) -> Image:
         """
         Scale the image to the given dimensions
         """
-        x_px = round(self._inches_to_px(self.x_dim))
-        y_px = round(self._inches_to_px(self.y_dim))
-        self.scaled_image = self.image
-        self.scaled_image.resize((x_px, y_px))
+        if self.image.size[0] > self.image.size[1]:
+            scale_factor = (1, self.image.size[1] / self.image.size[0])
+        elif self.image.size[0] < self.image.size[1]:
+            scale_factor = (self.image.size[0] / self.image.size[1], 1)
+            
+        x_dim = self._inches_to_px(self.size * scale_factor[0])
+        y_dim = self._inches_to_px(self.size * scale_factor[1])
+             
+        self.scaled_image = self.image.resize((x_dim, y_dim))
         return self.scaled_image
 
 class Classifier(Carver):
@@ -130,8 +163,13 @@ class Estimator(Carver):
     
 if __name__ == "__main__":
     loader = il.ImageLoader()
-    images = loader.load_images_from_dir(f"{fd.askdirectory()}")
+    images = loader.load_images_from_dir(r".\samples")#f"{fd.askdirectory()}")
     for image in images:
-        cv = Carver(images[image], x_dim=3.0, y_dim=3.0)
+        cv = Carver(images[image], size=3.0, target_dpi=300.0)
+        print(cv)
         print(f"resized: {cv.image.size} -> {cv.scaled_image.size}")
-        cv.scaled_image.save(f".\images\scaled_{image}")
+        if not os.path.exists(f".\images\scaled_{image}"):
+            cv.quantized_image.save(f".\images\quantized_{image}")
+        else:
+            os.remove(f".\images\scaled_{image}")
+            cv.quantized_image.save(f".\images\quantized_{image}")
