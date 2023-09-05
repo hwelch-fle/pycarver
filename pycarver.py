@@ -1,4 +1,4 @@
-from pycarver_utils import image_loader as il
+from pycarver_utils.image_loader import ImageLoader
 
 import tkinter as tk
 import tkinter.filedialog as fd
@@ -162,10 +162,10 @@ class Estimator(Carver):
         return self.image
     
 if __name__ == "__main__":
-    loader = il.ImageLoader()
-    images = loader.load_images_from_dir(r".\samples")#f"{fd.askdirectory()}")
+    loader = ImageLoader()
+    images = loader.load_images_from_dir(r".\samples")
     for image in images:
-        cv = Carver(images[image], size=3.0, target_dpi=300.0)
+        cv = Carver(images[image], size=8.0, target_dpi=300.0)
         print(cv)
         print(f"resized: {cv.image.size} -> {cv.scaled_image.size}")
         if not os.path.exists(f".\images\scaled_{image}"):
