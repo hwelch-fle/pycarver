@@ -138,7 +138,7 @@ class Carver(object):
         """
         Calculate the entropy of the image
         """
-        return self.quantized_image.entropy() #scipy.stats.entropy(self.quantized_image.histogram())
+        return self.image.entropy()-2 #scipy.stats.entropy(self.quantized_image.histogram())
 
 class Classifier(Carver):
     """
