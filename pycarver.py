@@ -27,7 +27,8 @@ class Carver(object):
         :param target_dpi: target dpi to scale to (default 300.0)
         :param use_image_dpi: use the image dpi to scale
         """
-        self.image = image
+        self.image = image 
+        self.image = self._set_mode()
         self.size = size
         self.use_image_dpi = use_image_dpi
         self.target_dpi = \
@@ -44,8 +45,12 @@ class Carver(object):
         pass
     
     def __str__(self) -> str:
+        if hasattr(self.image, 'filename'):
+            fn = self.image.filename
+        else:
+            fn = "Unknown Filename"
         return f"""<Carver:
-                Filename: {self.image.filename}
+                Filename: {fn}
                 Image: {self.image}
                 Size: {self.size}
                 Target DPI: {self.target_dpi}
@@ -66,6 +71,15 @@ class Carver(object):
             return None
         else:
             return round(inches * self.target_dpi)
+    
+    def _set_mode(self) -> Image:
+        """
+        Set the mode of the image to RGBA
+        """
+        if self.image.mode != 'RGBA':
+            return self.image.convert('RGBA')
+        else:
+            return self.image
     
     def _scale_image(self) -> Image:
         """
@@ -100,13 +114,15 @@ class Carver(object):
         """
         Get the area to carve
         """
-        to_carve = len([px for px in self.quantized_image.getdata() if px == 1])
+        to_carve = len([px for px in self.quantized_image.getdata() if px == 0])
         return to_carve / (self.target_dpi**2)
 
     def _scale_image_dimensions(self) -> Image:
         """
         Scale the image to the given dimensions
         """
+        scale_factor = (1, 1)
+        
         if self.image.size[0] > self.image.size[1]:
             scale_factor = (1, self.image.size[1] / self.image.size[0])
         elif self.image.size[0] < self.image.size[1]:
@@ -122,7 +138,7 @@ class Carver(object):
         """
         Calculate the entropy of the image
         """
-        return scipy.stats.entropy(self.quantized_image.histogram())
+        return self.quantized_image.entropy() #scipy.stats.entropy(self.quantized_image.histogram())
 
 class Classifier(Carver):
     """
@@ -175,7 +191,7 @@ if __name__ == "__main__":
     images = loader.load_images_from_dir(r".\samples")
     carvers = {}
     for image in images:
-        cv = Carver(images[image], size=8.0, target_dpi=300.0)
+        cv = Carver(images[image], size=3.0, target_dpi=300.0)
         carvers[image] = cv
         print(cv)
         print(f"resized: {cv.image.size} -> {cv.scaled_image.size}")
