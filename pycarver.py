@@ -4,8 +4,9 @@ import tkinter as tk
 import tkinter.filedialog as fd
 import os
 import numpy
+import scipy.stats
 from PIL import Image
-from PIL import ImageMath
+
 
 class Carver(object):
     """
@@ -39,6 +40,7 @@ class Carver(object):
         self.scaled_image = self._scale_image()
         self.quantized_image = self._quantize_image()
         self.carving_area = self._get_carving_area()
+        self.entropy = self._calculate_entropy()
         pass
     
     def __str__(self) -> str:
@@ -51,6 +53,7 @@ class Carver(object):
                 Scaled Image: {self.scaled_image}
                 Quantized Image: {self.quantized_image}
                 Carving Area: {self.carving_area}
+                Entropy: {self.entropy}
 >"""
     
     def _inches_to_px(self, inches:float) -> float:
@@ -114,6 +117,12 @@ class Carver(object):
              
         self.scaled_image = self.image.resize((x_dim, y_dim))
         return self.scaled_image
+    
+    def _calculate_entropy(self) -> float:
+        """
+        Calculate the entropy of the image
+        """
+        return scipy.stats.entropy(self.quantized_image.histogram())
 
 class Classifier(Carver):
     """
@@ -164,8 +173,10 @@ class Estimator(Carver):
 if __name__ == "__main__":
     loader = ImageLoader()
     images = loader.load_images_from_dir(r".\samples")
+    carvers = {}
     for image in images:
         cv = Carver(images[image], size=8.0, target_dpi=300.0)
+        carvers[image] = cv
         print(cv)
         print(f"resized: {cv.image.size} -> {cv.scaled_image.size}")
         if not os.path.exists(f".\images\scaled_{image}"):

@@ -7,7 +7,7 @@ class ImageLoader(object):
     """
     
     def __init__(self) -> None:
-        self.image_extensions = [".jpg", ".png", ".jpeg"]
+        self.image_extensions = [".bmp", ".png"]
         self.images = {}
         pass
     
